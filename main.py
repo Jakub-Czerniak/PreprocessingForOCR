@@ -1,7 +1,9 @@
 import numpy as np
 from PIL import Image
 import math
-
+import cv2 as cv
+import os
+from skimage import skeletonize
 
 def average_grayscale_conversion(image):
     for i in range(image.shape[0]):
@@ -76,6 +78,7 @@ def binarization(image, threshold):
     return image
 
 
+
 def projection_profile_skew(image, max_skew):
     sum_in_row = np.zeros(2*max_skew+1, image.shape[1])
     variation = np.zeros(2*max_skew+1)
@@ -84,7 +87,35 @@ def projection_profile_skew(image, max_skew):
         for row, i in image:
             sum_in_row[skew][i] = row.sum()
         variation[skew] = np.var(sum_in_row[skew])
-    
+
+def threshold_otsu(image):
+    image = normalization_grayscale(image)
+    _, image = cv.threshold(img, 0, 255, cv.THRESH_BINARY+cv.THRESH_OTSU)
+    return image
+
+
+def preprocessing_folder(folder_path):
+    for image in os.listdir(folder_path):
+        preprocessing(folder_path + image)
+
+
+def show_image(img):
+    cv.imshow('img', img)
+    cv.waitKey()
+
+def
+
+def preprocessing(image_path):
+    img = cv.imread(image_path)
+    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    img = cv.adaptiveThreshold(img, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 251, 25)
+    img = skeletonize(img)
+    img = cv.fastNlMeansDenoising(src=img, h=10, templateWindowSize=7, searchWindowSize=15)
+    if not os.path.exists('PreprocessedImages/'):
+        os.makedirs('PreprocessedImages/')
+    image_name = os.path.basename(os.path.normpath(image_path))
+    cv.imwrite('PreprocessedImages/' + image_name, img)
+
 
 
 img = Image.open('SampleFiles/gray_text.jpg', 'r')
