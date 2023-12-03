@@ -1,6 +1,3 @@
-import sys
-
-import numpy
 import numpy as np
 import math
 import cv2 as cv
@@ -83,14 +80,19 @@ def binarization(image, threshold):
 
 
 def projection_profile_skew(image, max_skew):
-    sum_in_row = np.zeros(2*max_skew+1, image.shape[1])
-    variation = np.zeros(2*max_skew+1)
+    temp_image = np.copy(image)
+    max_variation = 0
+    rotation = 0
     for skew in range(-max_skew, max_skew):
-        image = rotate(image, 1)
-        for row, i in image:
-            sum_in_row[skew][i] = row.sum()
-        variation[skew] = np.var(sum_in_row[skew])
-
+        temp_image = rotate(image, skew)
+        sum_in_row = np.zeros(temp_image.shape[0], dtype=int)
+        for i in range(temp_image.shape[0]):
+            sum_in_row[i] = temp_image[i].sum()
+        variation = np.var(sum_in_row)
+        if max_variation < variation:
+            max_variation = variation
+            rotation = skew
+    image = np.ascontiguousarray(rotate(image, rotation))
     return image
 
 
@@ -121,18 +123,13 @@ def show_image(img):
 
 def preprocessing(image_path):
     img = cv.imread(image_path)
-    show_image(img)
     img = weighted_grayscale_conversion(img)
-    show_image(img)
     img = adaptive_thresholding(img)
-    show_image(img)
-    # img = projection_profile_skew(img, 15)
     img = invert(img)
+    img = projection_profile_skew(img, 10)
     img = skeletonize(img).astype(np.uint8)
     img = normalization_grayscale(img)
-    show_image(img)
     img = denoising(img)
-    show_image(img)
     if not os.path.exists('PreprocessedImages/'):
         os.makedirs('PreprocessedImages/')
     image_name = os.path.basename(os.path.normpath(image_path))
