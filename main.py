@@ -1,9 +1,13 @@
+import sys
+
+import numpy
 import numpy as np
-from PIL import Image
 import math
 import cv2 as cv
 import os
-from skimage import skeletonize
+from skimage.morphology import skeletonize, thin
+from skimage.util import invert
+
 
 def average_grayscale_conversion(image):
     for i in range(image.shape[0]):
@@ -17,7 +21,7 @@ def weighted_grayscale_conversion(image):
     # Grayscale = 0.299R + 0.587G + 0.114B
     for i in range(image.shape[0]):
         for j in range(image.shape[1]):
-            image[i][j][0] = np.uint8(0.288 * image[i][j][0] + 0.587 * image[i][j][1] + 0.114 * image[i][j][2])
+            image[i][j][0] = np.uint8(0.288 * image[i][j][2] + 0.587 * image[i][j][1] + 0.114 * image[i][j][2])
     image = image[:, :, 0]
     return image
 
@@ -25,11 +29,11 @@ def weighted_grayscale_conversion(image):
 def normalization_grayscale(image):
     img_max = image.max()
     img_min = image.min()
-    print(img_min, img_max)
-    if img_max != 255 and img_min != 0:
+    if not img_max == 255 and img_min == 0:
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 image[i][j] = 255 * (image[i][j] - img_min) / (img_max - img_min)
+    return image
 
 
 def shear(image, x_shear, y_shear):
@@ -78,7 +82,6 @@ def binarization(image, threshold):
     return image
 
 
-
 def projection_profile_skew(image, max_skew):
     sum_in_row = np.zeros(2*max_skew+1, image.shape[1])
     variation = np.zeros(2*max_skew+1)
@@ -88,11 +91,23 @@ def projection_profile_skew(image, max_skew):
             sum_in_row[skew][i] = row.sum()
         variation[skew] = np.var(sum_in_row[skew])
 
-def threshold_otsu(image):
-    image = normalization_grayscale(image)
-    _, image = cv.threshold(img, 0, 255, cv.THRESH_BINARY+cv.THRESH_OTSU)
     return image
 
+
+def thresholding_otsu(image):
+    image = normalization_grayscale(image)
+    _, image = cv.threshold(image, 0, 255, cv.THRESH_BINARY+cv.THRESH_OTSU)
+    return image
+
+
+def adaptive_thresholding(image):
+    image = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 251, 20)
+    return image
+
+
+def denoising(image):
+    image = cv.fastNlMeansDenoising(src=image, h=30, templateWindowSize=7, searchWindowSize=21)
+    return image
 
 def preprocessing_folder(folder_path):
     for image in os.listdir(folder_path):
@@ -103,24 +118,26 @@ def show_image(img):
     cv.imshow('img', img)
     cv.waitKey()
 
-def
 
 def preprocessing(image_path):
     img = cv.imread(image_path)
-    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    img = cv.adaptiveThreshold(img, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 251, 25)
-    img = skeletonize(img)
-    img = cv.fastNlMeansDenoising(src=img, h=10, templateWindowSize=7, searchWindowSize=15)
+    show_image(img)
+    img = weighted_grayscale_conversion(img)
+    show_image(img)
+    img = adaptive_thresholding(img)
+    show_image(img)
+    # img = projection_profile_skew(img, 15)
+    img = invert(img)
+    img = skeletonize(img).astype(np.uint8)
+    img = normalization_grayscale(img)
+    show_image(img)
+    img = denoising(img)
+    show_image(img)
     if not os.path.exists('PreprocessedImages/'):
         os.makedirs('PreprocessedImages/')
     image_name = os.path.basename(os.path.normpath(image_path))
     cv.imwrite('PreprocessedImages/' + image_name, img)
 
 
+preprocessing('HandText.jpg')
 
-img = Image.open('SampleFiles/gray_text.jpg', 'r')
-img_arr = np.array(img)
-img_arr = binarization(img_arr, 127)
-img_arr = rotate(img_arr, -20)
-img = Image.fromarray(img_arr)
-img.show()
